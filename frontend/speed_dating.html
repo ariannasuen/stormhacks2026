@@ -71,7 +71,7 @@
 
   /* ---------- character sprites ---------- */
   .sprite {
-    position: absolute; bottom: 0; height: 88%; width: 26%;
+    position: absolute; bottom: 0; height: 100%; width: 26%;
     opacity: 0; transform: translateY(2em);
     transition: opacity .3s, transform .3s, filter .3s;
     filter: brightness(.6) saturate(.7);
@@ -79,9 +79,9 @@
   }
   .sprite.show { opacity: 1; transform: none; }
   .sprite.active { filter: none; }
-  .sprite.left  { left: 6%; }
-  .sprite.right { right: 6%; }
-  .sprite img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; display: none; }
+  .sprite.left  { left: 4%; }
+  .sprite.right { right: 25%; }
+  .sprite img { width: 200%; height: 90%; object-fit: contain; object-position: bottom; display: none; }
   .sprite .ph {
     display: none; width: 100%; height: 100%;
     align-items: center; justify-content: center; text-align: center;
@@ -172,16 +172,20 @@
     text-align: center; color: #fff;
   }
   .overlay.on { display: flex; }
-  #startScreen, #nameScreen, #summaryScreen, #pickScreen, #endScreen {
-    background: radial-gradient(circle at 50% 30%, rgba(122,92,255,.55), rgba(18,10,28,.95));
+  #startScreen {
+    background: url("assets/bg/ba.png") center / cover no-repeat;
     padding: 3em;
-  }
+    }
   #startScreen h1 { font-size: 4.2em; margin: 0 0 .2em; text-shadow: 0 .06em 0 var(--accent-2), 0 .12em .4em rgba(0,0,0,.6); }
   #startScreen p { font-size: 1.5em; margin: 0 0 1.6em; opacity: .9; }
   #nameScreen h2, #summaryScreen h2, #pickScreen h2 { font-size: 2.4em; margin: 0 0 .6em; }
   #nameInput {
     font: inherit; font-size: 1.8em; padding: .4em .8em; border-radius: .8em;
     border: .12em solid #fff; text-align: center; margin-bottom: 1em; width: 14em;
+     background: radial-gradient(
+        circle at 50% 30%,
+        rgba(255,95,162,.55),
+        rgba(18,10,28,.95));
   }
 
   #titleCard { background: rgba(10,4,20,.82); pointer-events: none; }
@@ -222,7 +226,7 @@
   <div id="bg"></div>
 
   <!-- ============ CHARACTER PNGs ============
-       left  = host otter currently speaking   (assets/characters/<host>.png)
+       left  = host otfter currently speaking   (assets/characters/<host>.png)
        right = the person you're currently on a date with -->
   <div class="sprite left"  id="spriteL"><img alt=""><div class="ph"></div></div>
   <div class="sprite right" id="spriteR"><img alt=""><div class="ph"></div></div>
@@ -363,7 +367,7 @@ const SCENES = [
 ]},
 
 /* ------------------------------------------------------------- CHAD */
-{ id:"chad", title:"Chad", char:"chad", bg:"chad", hue:20,
+{ id:"chad", title:"Chad", char:"chad", bg:"pub", hue:20,
   // BACKGROUND PNG: assets/bg/chad.png
   steps:[
     N("You’re brought to a standing table where your newfound date is waiting. The blinding sheen of his oiled muscles nearly overpowers the ambient lighting."),
@@ -391,7 +395,7 @@ const SCENES = [
 ]},
 
 /* ------------------------------------------------------------ RICKY */
-{ id:"ricky", title:"Ricky", char:"ricky", bg:"ricky", hue:95,
+{ id:"ricky", title:"Ricky", char:"ricky", bg:"pub", hue:95,
   // BACKGROUND PNG: assets/bg/ricky.png
   steps:[
     N("You smell him before you see him: the stench almost knocks you off your feet. He slicks his greasy hair back with a cheeto-dusted hand and smiles shakily at you."),
@@ -412,7 +416,7 @@ const SCENES = [
 ]},
 
 /* ---------------------------------------------------------- CHARLIE */
-{ id:"charlie", title:"Charlie", char:"charlie", bg:"charlie", hue:210,
+{ id:"charlie", title:"Charlie", char:"charlie", bg:"pub", hue:210,
   // BACKGROUND PNG: assets/bg/charlie.png
   steps:[
     N("A pale woman crawls into the light. She looks like she hasn’t seen the sun in weeks."),
@@ -434,7 +438,7 @@ const SCENES = [
 ]},
 
 /* ------------------------------------------------------------ BARTH */
-{ id:"barth", title:"Barth", char:"barth", bg:"barth", hue:140,
+{ id:"barth", title:"Barth", char:"barth", bg:"pub", hue:140,
   // BACKGROUND PNG: assets/bg/barth.png
   steps:[
     N("The ominous clicking of a geiger counter unsettles you. A scruffy man glances this way and that before sitting down."),
@@ -456,7 +460,7 @@ const SCENES = [
 ]},
 
 /* ------------------------------------------------------------- GERD */
-{ id:"gerd", title:"Gerd", char:"gerd", bg:"gerd", hue:45,
+{ id:"gerd", title:"Gerd", char:"gerd", bg:"pub", hue:45,
   // BACKGROUND PNG: assets/bg/gerd.png
   steps:[
     N("A very disproportionate man takes the seat across from you. He combs back his flowing hair and squints at you, assessing your every move."),
@@ -479,7 +483,7 @@ const SCENES = [
 
 /* ------------------------------------------------------------ SHADY
    Spooky interlude: no points (every reply is 0) and no ending. */
-{ id:"shady", title:"???", char:"shady", bg:"shady", hue:260, fx:"spooky", noScore:true,
+{ id:"shady", title:"???", char:"shady", bg:"summary", hue:260, fx:"spooky", noScore:true,
   // BACKGROUND PNG: assets/bg/shady.png
   steps:[
     N("The room’s temperature seems to plummet ten degrees. You feel strangely observed, scanning the bar, not noticing the shadowed figure that silently meets you from across the table."),
@@ -500,7 +504,7 @@ const SCENES = [
 ]},
 
 /* -------------------------------------------------------- ANASTASIA */
-{ id:"anastasia", title:"Anastasia", char:"anastasia", bg:"anastasia", hue:300,
+{ id:"anastasia", title:"Anastasia", char:"anastasia", bg:"pub", hue:300,
   // BACKGROUND PNG: assets/bg/anastasia.png
   steps:[
     N("Soft-footed and mysterious, your next date slinks into her seat like a rolling wave of tar, adorned with silver jewelry and crude makeup. Her expression is set in a frigid sort of numbness."),
@@ -522,7 +526,7 @@ const SCENES = [
 ]},
 
 /* -------------------------------------------------------- MACKENZIE */
-{ id:"mackenzie", title:"Mackenzie", char:"mackenzie", bg:"mackenzie", hue:335,
+{ id:"mackenzie", title:"Mackenzie", char:"mackenzie", bg:"pub", hue:335,
   // BACKGROUND PNG: assets/bg/mackenzie.png
   steps:[
     N("A new woman takes Anastasia’s place, popping her bubblegum as her nails click away noisily on her phone. She takes half glances up from her screen before finally putting her phone away to give you her undivided attention."),
@@ -542,7 +546,7 @@ const SCENES = [
 ]},
 
 /* ---------------------------------------------------------- RACCOON */
-{ id:"raccoon", title:"Raccoon", char:"raccoon", bg:"raccoon", hue:180,
+{ id:"raccoon", title:"Raccoon", char:"raccoon", bg:"pub", hue:180,
   // BACKGROUND PNG: assets/bg/raccoon.png
   steps:[
     N("Instead of a human like you were expecting, a raccoon clambers into the seat. It stares up at you with big, black eyes, making soft raccoon noises."),
@@ -558,7 +562,7 @@ const SCENES = [
 ]},
 
 /* ---------------------------------------------------------- EIGHDYN */
-{ id:"eighdyn", title:"Eighdyn", char:"eighdyn", bg:"eighdyn", hue:160,
+{ id:"eighdyn", title:"Eighdyn", char:"eighdyn", bg:"pub", hue:160,
   // BACKGROUND PNG: assets/bg/eighdyn.png
   steps:[
     N("The man across from you swirls his matcha cup, a labubu hanging neatly from his carabiner, unopened novel sticking out of his backpocket. He flicks the curled up end of his mullet, lounged back in his chair like speed dating is his comfort zone."),
@@ -577,7 +581,7 @@ const SCENES = [
 ]},
 
 /* -------------------------------------------------------- OUTRODUCTION */
-{ id:"outro", title:null, char:null, bg:"pub", hue:285,
+{ id:"outro", title:null, char:null, bg:"null", hue:285, background:"radial-gradient(circle at 50% 30%, rgba(122,92,255,.55), rgba(18,10,28,.95))",
   // BACKGROUND PNG: assets/bg/pub.png
   steps:[
     S("Spendy","Thank you for coming to our SFU Speed Dating Event!"),
