@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LoveSurge</title>
+
+<!--
+=====================================================================
+ PNG ASSET GUIDE  (put these next to this HTML file)
+=====================================================================
+ The game runs WITHOUT any images (you get coloured backgrounds and
+ dashed placeholder boxes). Drop PNGs in with these exact names and
+ they appear automatically:
+
+ BACKGROUNDS   assets/bg/<name>.png      (suggested 1600x900)
+   pub, chad, ricky, charlie, barth, gerd, shady, anastasia,
+   mackenzie, raccoon, eighdyn, summary,
+   ending_a, ending_b, ending_c, ending_d, ending_e, ending_f,
+   ending_g, ending_h, ending_i, ending_j, ending_k
+
+ CHARACTERS    assets/characters/<name>.png   (transparent PNG, ~600x900)
+   spendy, sparky, stormy, trendy, shady,
+   chad, ricky, charlie, barth, gerd, anastasia, mackenzie,
+   raccoon, eighdyn
+
+ The place where each scene picks its background is marked with a
+ "BACKGROUND PNG" comment in the SCRIPT section of the JavaScript below.
+=====================================================================
+-->
+
+<style>
+  :root {
+    --ink: #2b1b3d;
+    --bubble: #fffaf3;
+    --accent: #ff5fa2;
+    --accent-2: #7a5cff;
+    --player: #dff4ff;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: #120a1c;
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    color: var(--ink);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ---------- game frame (16:9) ---------- */
+  #game {
+    position: relative;
+    width: min(100vw, calc(100vh * 16 / 9));
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #000;
+    user-select: none;
+    font-size: calc(min(100vw, 100vh * 16 / 9) / 62);   /* everything scales with em */
+  }
+
+  /* ---------- background layer ---------- */
+  #bg {
+    position: absolute; inset: 0;
+    --hue: 280;
+    background:
+      var(--bg, none) center / cover no-repeat,
+      linear-gradient(160deg, hsl(var(--hue) 45% 30%), hsl(calc(var(--hue) + 40) 50% 13%));
+    transition: filter .6s;
+  }
+  #game.spooky #bg { filter: grayscale(.85) brightness(.55) contrast(1.15); }
+  #game.spooky .sprite img { filter: brightness(.25) contrast(1.4); }
+
+  /* ---------- character sprites ---------- */
+  .sprite {
+    position: absolute; bottom: 0; height: 88%; width: 26%;
+    opacity: 0; transform: translateY(2em);
+    transition: opacity .3s, transform .3s, filter .3s;
+    filter: brightness(.6) saturate(.7);
+    pointer-events: none;
+  }
+  .sprite.show { opacity: 1; transform: none; }
+  .sprite.active { filter: none; }
+  .sprite.left  { left: 6%; }
+  .sprite.right { right: 6%; }
+  .sprite img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; display: none; }
+  .sprite .ph {
+    display: none; width: 100%; height: 100%;
+    align-items: center; justify-content: center; text-align: center;
+    border: .2em dashed rgba(255,255,255,.55); border-radius: 1em;
+    background: rgba(255,255,255,.08);
+    color: rgba(255,255,255,.85); font-size: 1.1em;
+  }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position: absolute; top: 1.2em; left: 1.5em; right: 1.5em;
+    display: flex; justify-content: space-between;
+    color: #fff; text-shadow: 0 .1em .3em rgba(0,0,0,.7);
+    font-size: 1.1em; pointer-events: none;
+  }
+  #debug { display: none; background: rgba(0,0,0,.6); padding: .3em .7em; border-radius: .5em; font-size: .85em; }
+
+  /* ---------- dialogue ---------- */
+  #dialogue {
+    position: absolute; left: 4%; right: 4%; bottom: 3.5%;
+    display: none;
+  }
+  #nameplate {
+    display: inline-block; margin: 0 0 -.3em 1.6em; position: relative; z-index: 1;
+    padding: .25em 1.2em; border-radius: 1em;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff; font-weight: 700; font-size: 1.35em;
+    box-shadow: 0 .15em .4em rgba(0,0,0,.35);
+  }
+  #bubble {
+    position: relative;
+    background: var(--bubble);
+    border: .22em solid var(--ink);
+    border-radius: 1.4em;
+    padding: 1.1em 1.6em 1.3em;
+    min-height: 6.2em;
+    font-size: 1.55em; line-height: 1.4;
+    box-shadow: 0 .3em 0 rgba(0,0,0,.35);
+  }
+  /* speech-bubble tail (points up toward the speaker) */
+  #bubble::before, #bubble::after {
+    content: ""; position: absolute; left: 3.2em; top: -1.05em;
+    border: .8em solid transparent; border-top: 0; border-bottom: .85em solid var(--ink);
+  }
+  #bubble::after { top: -.78em; border-bottom-color: var(--bubble); }
+  #caret {
+    position: absolute; right: 1em; bottom: .4em; color: var(--accent);
+    animation: bob .8s infinite alternate; visibility: hidden;
+  }
+  #caret.on { visibility: visible; }
+  @keyframes bob { to { transform: translateY(.25em); } }
+
+  /* the player's lines: right-hand side, blue */
+  #dialogue.player { text-align: right; }
+  #dialogue.player #nameplate { margin: 0 1.6em -.3em 0; background: linear-gradient(135deg, #3aa0ff, #36d1c4); }
+  #dialogue.player #bubble { background: var(--player); text-align: left; }
+  #dialogue.player #bubble::before, #dialogue.player #bubble::after { left: auto; right: 3.2em; }
+  #dialogue.player #bubble::after { border-bottom-color: var(--player); }
+
+  /* narration: no tail, no name */
+  #dialogue.narr #nameplate { display: none; }
+  #dialogue.narr #bubble { background: rgba(30,18,48,.92); color: #f6ecff; border-color: #f6ecff; font-style: italic; }
+  #dialogue.narr #bubble::before, #dialogue.narr #bubble::after { display: none; }
+  #bubble.italic #text { font-style: italic; }
+
+  /* ---------- choices ---------- */
+  #choices {
+    position: absolute; left: 12%; right: 12%; bottom: 36%;
+    display: none; flex-direction: column; gap: .55em;
+  }
+  #choices button, .btn {
+    font: inherit; font-size: 1.45em; text-align: left; cursor: pointer;
+    padding: .55em 1.1em; border-radius: 1em;
+    border: .16em solid var(--ink); background: var(--bubble); color: var(--ink);
+    box-shadow: 0 .2em 0 rgba(0,0,0,.35);
+    transition: transform .08s, background .15s;
+  }
+  #choices button:hover, .btn:hover { background: #ffe3f1; transform: translateY(-.1em); }
+  #choices button .n { color: var(--accent); font-weight: 700; margin-right: .6em; }
+  #choices button.it span.t { font-style: italic; }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; text-align: center; }
+  .btn.primary:hover { filter: brightness(1.1); }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center; flex-direction: column;
+    text-align: center; color: #fff;
+  }
+  .overlay.on { display: flex; }
+  #startScreen, #nameScreen, #summaryScreen, #pickScreen, #endScreen {
+    background: radial-gradient(circle at 50% 30%, rgba(122,92,255,.55), rgba(18,10,28,.95));
+    padding: 3em;
+  }
+  #startScreen h1 { font-size: 4.2em; margin: 0 0 .2em; text-shadow: 0 .06em 0 var(--accent-2), 0 .12em .4em rgba(0,0,0,.6); }
+  #startScreen p { font-size: 1.5em; margin: 0 0 1.6em; opacity: .9; }
+  #nameScreen h2, #summaryScreen h2, #pickScreen h2 { font-size: 2.4em; margin: 0 0 .6em; }
+  #nameInput {
+    font: inherit; font-size: 1.8em; padding: .4em .8em; border-radius: .8em;
+    border: .12em solid #fff; text-align: center; margin-bottom: 1em; width: 14em;
+  }
+
+  #titleCard { background: rgba(10,4,20,.82); pointer-events: none; }
+  #titleCard .small { font-size: 1.6em; letter-spacing: .3em; text-transform: uppercase; opacity: .8; }
+  #titleCard .big { font-size: 6em; font-weight: 800; text-shadow: 0 .06em 0 var(--accent), 0 .1em .5em #000; }
+  #titleCard.on { animation: card 1.7s both; }
+  @keyframes card { 0% { opacity: 0; } 15%, 80% { opacity: 1; } 100% { opacity: 0; } }
+
+  #timesUp { background: rgba(255,95,162,.25); pointer-events: none; }
+  #timesUp .big { font-size: 7em; font-weight: 900; text-shadow: 0 .06em 0 var(--accent-2), 0 .1em .4em #000; }
+  #timesUp.on { animation: card 1.4s both; }
+
+  /* summary */
+  #summaryList { width: min(46em, 90%); display: flex; flex-direction: column; gap: .5em; margin-bottom: 1.2em; }
+  .row {
+    display: grid; grid-template-columns: 7em 1fr 14em; align-items: center; gap: 1em;
+    background: rgba(255,255,255,.1); border-radius: .8em; padding: .45em 1em; font-size: 1.25em; text-align: left;
+  }
+  .row .hearts { letter-spacing: .1em; color: var(--accent); }
+  .row .hearts .off { color: rgba(255,255,255,.25); }
+  .row .status { text-align: right; opacity: .9; font-size: .9em; }
+  .row.max { background: rgba(255,95,162,.35); outline: .12em solid var(--accent); }
+
+  /* ending pick / ending */
+  #pickList { display: flex; flex-direction: column; gap: .7em; width: min(34em, 90%); }
+  #pickList .btn { text-align: center; }
+  #endScreen { background-size: cover; }
+  #endScreen .letter { font-size: 1.5em; letter-spacing: .3em; opacity: .85; }
+  #endScreen h1 { font-size: 4.2em; margin: .1em 0 .3em; text-shadow: 0 .06em 0 var(--accent-2); }
+  #endScreen p { font-size: 1.9em; max-width: 24em; line-height: 1.45; background: rgba(10,4,20,.7); padding: .8em 1.2em; border-radius: 1em; }
+</style>
+</head>
+
+<body>
+<div id="game">
+
+  <!-- ============ BACKGROUND PNG (set per scene from the script) ============ -->
+  <div id="bg"></div>
+
+  <!-- ============ CHARACTER PNGs ============
+       left  = host otter currently speaking   (assets/characters/<host>.png)
+       right = the person you're currently on a date with -->
+  <div class="sprite left"  id="spriteL"><img alt=""><div class="ph"></div></div>
+  <div class="sprite right" id="spriteR"><img alt=""><div class="ph"></div></div>
+
+  <div id="hud"><span id="hudScene"></span><span id="debug"></span></div>
+
+  <!-- ============ CHOICES ============ -->
+  <div id="choices"></div>
+
+  <!-- ============ SPEECH BUBBLE ============ -->
+  <div id="dialogue">
+    <div id="nameplate"></div>
+    <div id="bubble"><span id="text"></span><span id="caret">&#9660;</span></div>
+  </div>
+
+  <!-- ============ OVERLAYS ============ -->
+  <div id="titleCard" class="overlay"><div class="small" id="cardSmall"></div><div class="big" id="cardBig"></div></div>
+  <div id="timesUp" class="overlay"><div class="big">Time&rsquo;s Up!</div></div>
+
+  <div id="startScreen" class="overlay on">
+    <h1>Love Surge: <br> An SFU Dating Sim</h1>
+    <button class="btn primary" id="startBtn">Start</button>
+  </div>
+
+  <div id="nameScreen" class="overlay">
+    <h2>What&rsquo;s your name?</h2>
+    <input id="nameInput" maxlength="20" placeholder="Enter your name" autocomplete="off" />
+    <button class="btn primary" id="nameBtn">That&rsquo;s me!</button>
+  </div>
+
+  <div id="summaryScreen" class="overlay">
+    <h2>Event Summary: Loves &amp; Hates</h2>
+    <div id="summaryList"></div>
+    <button class="btn primary" id="summaryBtn">Continue</button>
+  </div>
+
+  <div id="pickScreen" class="overlay">
+    <h2>Several people want you! Whose ending do you want?</h2>
+    <div id="pickList"></div>
+  </div>
+
+  <div id="endScreen" class="overlay">
+    <div class="letter" id="endLetter"></div>
+    <h1 id="endTitle"></h1>
+    <p id="endText"></p>
+    <br>
+    <button class="btn primary" id="againBtn">Play Again</button>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   CONFIG
+   ===================================================================== */
+const MAX_POINTS = 6;                      // max per person (3 questions x 2 pts)
+const BG_PATH   = k => `assets/bg/${k}.png`;
+const CHAR_PATH = k => `assets/characters/${k}.png`;
+const TYPE_MS   = 16;                      // typewriter speed (ms per character)
+
+// Ending K ("Special") unlocks when you max out ALL of these people.
+// (Assumption - edit this list if you meant something different.)
+const SPECIAL_REQUIRES = ["chad","ricky","charlie","barth","gerd","anastasia","mackenzie","eighdyn","raccoon"];
+
+// Hosts (appear on the left)
+const HOSTS = ["spendy","sparky","stormy","trendy","shady"];
+
+// Status label for each point total 0..6  (mirrors RelationshipStatus in relationship.h)
+const STATUS = [
+  "Hates you", "Dislikes you", "Feels neutral about you", "Wants to be friends",
+  "Wants a second date", "Likes you", "Is infatuated with you!"
+];
+
+/* =====================================================================
+   CHARACTERS + ENDINGS
+   ===================================================================== */
+const CHARS = {
+  chad:      { name:"Chad",      age:24,   letter:"B", bg:"ending_b",
+    ending:"You and Chad date for a while until he decides after a week that you’re holding him back from his potential." },
+  ricky:     { name:"Ricky",     age:30,   letter:"C", bg:"ending_c",
+    ending:"You date Ricky for a little bit, but ultimately a disagreement over the superior coding language ends your love story. He codes in assembly, and you prefer to appreciate the simplicity of python." },
+  charlie:   { name:"Charlie",   age:23,   letter:"D", bg:"ending_d",
+    ending:"You two go on a few dates, but eventually she realizes she doesn’t have time for you. It’s busy out there for an Engineering student, and those 5 labs are catching up to her." },
+  barth:     { name:"Barth",     age:20,   letter:"E", bg:"ending_e",
+    ending:"Unfortunately Barth’s missing thallium-204 was actually in his pocket, irradiating the two of you gradually over time. You both get radiation poisoning." },
+  gerd:      { name:"Gerd",      age:18,   letter:"F", bg:"ending_f",
+    ending:"Although it seems like a good match at first, in the end, Gerd ends up nerding you out. The relationship does not last." },
+  anastasia: { name:"Anastasia", age:22,   letter:"G", bg:"ending_g",   // age not in your files - change if needed
+    ending:"Anastasia reinvented her aesthetic after two months and you didn’t quite fit her new muse concept. Safe to say the concept of the relationship didn’t last either.." },
+  mackenzie: { name:"Mackenzie", age:21,   letter:"H", bg:"ending_h",
+    ending:"She bled both your wallet and your heart dry and soon enough, you had nothing left to give. Ghosted after 6 weeks." },
+  eighdyn:   { name:"Eighdyn",   age:27,   letter:"I", bg:"ending_i",
+    ending:"Eight months in you catch him talking to five other people on his phone. So much for feminism." },
+  raccoon:   { name:"Raccoon",   age:1000, letter:"J", bg:"ending_j",
+    ending:"You domesticated the raccoon and made a lifelong friend.. What’s the purpose of a speed dating event again?" },
+  shady:     { name:"???",       age:0 }   // no points / no ending - just spooky
+};
+const SPECIAL_ENDING = { name:"Special", letter:"K", bg:"ending_k",
+  ending:"You’re quite the people pleaser. Everyone’s head over heels for you!" };
+const ALONE_ENDING   = { name:"Alone",   letter:"A", bg:"ending_a",
+  ending:"You finish your degree with no complications. No love complications, that is." };
+
+/* =====================================================================
+   SCRIPT
+   Helpers:  S(who,text)  = someone speaks
+             N(text)      = narration
+             A(who,text,[ [reply, points], ... ])  = date asks, player picks
+                 (who/text can be null to re-use the bubble already on screen)
+             TU           = "Time's Up!" banner
+   {name} = player's name, {age} = age of the current date
+   ===================================================================== */
+const S  = (who, text) => ({ t:"say",  who, text });
+const N  = (text)      => ({ t:"narr", text });
+const A  = (who, text, opts) => ({ t:"ask", who, text, opts });
+const TU = { t:"timesup" };
+
+const SCENES = [
+
+/* ------------------------------------------------------------ INTRO */
+{ id:"intro", title:null, char:null, bg:"pub", hue:285,
+  // BACKGROUND PNG: assets/bg/pub.png
+  steps:[
+    N("After a grueling day at the SFU Burnaby campus, you want nothing more than a solo drink at the local Biercraft before you bus home. Heading into the pub, you’re instantly bombarded by four colourful, furry critters."),
+    S("Spendy","Hello!"),
+    S("Sparky","You must be here for the SFU Speed Dating Event, right?"),
+    A(null,null,[["“Uhh…”",0]]),
+    S("Stormy","...you don’t know what that is?"),
+    S("Trendy","It’s only the most popular event ever held on campus!"),
+    S("Spendy","And you’re just in luck, because we have an empty spot with your name on it!"),
+    S("Sparky","What’s your name?"),
+    { t:"name" },
+    S("Spendy","Nice to meet you {name}!"),
+    S("Stormy","Alright, hot single, here’s the gameplan:"),
+    S("Sparky","Your date will ask a few questions, and you’ll answer them."),
+    S("Spendy","And based on your replies, they might reach out at the end of the night to get your number."),
+    S("Trendy","Oooh, I can feel the romance in the air already!"),
+    S("Stormy","Pro Tip: play it cool and don’t overthink it. If it’s meant to be, then it’s meant to be."),
+    S("Trendy","I think you’re all set. Come right this way – you’re in for the night of your life!"),
+]},
+
+/* ------------------------------------------------------------- CHAD */
+{ id:"chad", title:"Chad", char:"chad", bg:"chad", hue:20,
+  // BACKGROUND PNG: assets/bg/chad.png
+  steps:[
+    N("You’re brought to a standing table where your newfound date is waiting. The blinding sheen of his oiled muscles nearly overpowers the ambient lighting."),
+    S("Sparky","This here is Chad, {age}, an attendee of the Beedie School of Business."),
+    S("Spendy","Have fun!"),
+    S("Stormy","But not too much fun."),
+    S("Trendy","See ya!"),
+    N("The otters give you both some privacy."),
+    A("Chad","What’s cookin’, good looking?!",[["Hi!",0],["Uh… Hello?",0],["*say nothing*",0]]),
+    A("Chad","So, sweetcheeks, how often are you hitting the gym?",[
+      ["“I LIVE at the gym!”",2],["“I don’t leave the house all that much, honestly.”",0],
+      ["“A couple times a month.”",1],["“I have a pass, but I never use it.”",1]]),
+    A("Chad","Do you invest in crypto?",[
+      ["“I’ve heard of Bitcoin.”",1],["“I maxed out my credit card on a meme coin once.”",1],
+      ["“Yes, I even have a whole investment portfolio in multiple stocks.”",2],["“People who do that sorta stuff are silly.”",0]]),
+    A("Chad","How do you feel about clubbing on the first date?",[
+      ["“I only go clubbing with my friends, really.”",1],["“I’m a party animal!”",2],
+      ["“I don’t participate in dangerous activities.”",0],["“I mean, if you really wanna…”",1]]),
+    TU,
+    S("Stormy","How was that, {name}?"),
+    S("Spendy","Did you have fun?"),
+    A(null,null,[["“Yes!”",0],["“Not really—”",0]]),
+    S("Sparky","That’s great to hear!"),
+    S("Trendy","Keep those love juices flowing, because we’ve got another hot single right around the corner!"),
+]},
+
+/* ------------------------------------------------------------ RICKY */
+{ id:"ricky", title:"Ricky", char:"ricky", bg:"ricky", hue:95,
+  // BACKGROUND PNG: assets/bg/ricky.png
+  steps:[
+    N("You smell him before you see him: the stench almost knocks you off your feet. He slicks his greasy hair back with a cheeto-dusted hand and smiles shakily at you."),
+    S("Spendy","*coughs* This is Ricky, an 8th year Computer Science major."),
+    S("Stormy","He’s hoping that this won’t just be the year he graduates, but also the year he finds love."),
+    S("Sparky","Have at it!"),
+    A("Ricky","Um… hi there.",[["“Hiya!”",0],["“Hey.”",0],["*say nothing*",0]]),
+    A("Ricky","Do you like vibe coding?",[
+      ["“I don’t know what that is.”",1],["“I do it all the time!”",2],
+      ["“I don’t use AI.”",0],["“Don’t really like coding, honestly.”",1]]),
+    A("Ricky","What’s your rank on Valorant?",[
+      ["*laugh in his face*",1],["“I like Animal Crossing.”",0],["“Bronze.”",2],["“Gold.”",1]]),
+    A("Ricky","I don’t believe in showers… are you okay with that?",[
+      ["“What?! No!”",0],["“We can work on it.”",1],["“I have a sensitive nose.”",1],["“I like a little stink.”",2]]),
+    TU,
+    S("Stormy","Still with us, {name}?"),
+    S("Sparky","Let’s keep going!"),
+]},
+
+/* ---------------------------------------------------------- CHARLIE */
+{ id:"charlie", title:"Charlie", char:"charlie", bg:"charlie", hue:210,
+  // BACKGROUND PNG: assets/bg/charlie.png
+  steps:[
+    N("A pale woman crawls into the light. She looks like she hasn’t seen the sun in weeks."),
+    S("Spendy","This is Charlie, {age}, who took a brief break from her five Engineering labs to be here."),
+    S("Sparky","Good luck!"),
+    A("Charlie","Sorry… I didn’t really get a chance to clean up before getting here…",[
+      ["“I don’t mind!”",0],["“All good.”",0],["*say nothing*",0]]),
+    A("Charlie","Have you applied for co-ops yet?",[
+      ["“I don’t know what that is.”",0],["“Yeah, I’ve already got a few offers.”",1],
+      ["“Nah, those aren’t required for my program.”",1],["“Yeah, but I haven’t gotten any interviews…”",2]]),
+    A("Charlie","Are you more of a homebody?",[
+      ["“Yeah, I’m lowkey a vampire at this point.”",2],["“Depends on the day.”",1],
+      ["“You can’t keep me locked up!”",0],["“I like going out sometimes.”",1]]),
+    A("Charlie","What’s your CGPA?",[
+      ["4.2",1],["3.4",2],["2.1",1],["“I don’t wanna talk about it…”",0]]),
+    TU,
+    S("Sparky","Ready for the next one?"),
+    S("Trendy","Yes! Yes! Yes!"),
+]},
+
+/* ------------------------------------------------------------ BARTH */
+{ id:"barth", title:"Barth", char:"barth", bg:"barth", hue:140,
+  // BACKGROUND PNG: assets/bg/barth.png
+  steps:[
+    N("The ominous clicking of a geiger counter unsettles you. A scruffy man glances this way and that before sitting down."),
+    S("Spendy","This is Bartholomew—"),
+    S("Barth","I go by Barth, dude!"),
+    S("Spendy","...this is Barth, {age}, and he’s a Physics major."),
+    S("Sparky","Get chatting!"),
+    A("Barth","You seen my thallium-204 anywhere?",[
+      ["“Your thallium what now?”",0],["“I don’t know what that is.”",1],
+      ["“Unfortunately no, sorry.”",2],["“Nah, good luck with the search.”",1]]),
+    A("Barth","Are you sure? It’s like a little green circle.",[
+      ["“It’s green?”",1],["“Yes, I’m sorry, man.”",2],["“Yup. Hope you find it.”",0],["“I don’t even know what it is.”",1]]),
+    A("Barth","I just feel really weird, like, so nauseous right now…",[
+      ["“Should I call someone?”",1],["“You don’t look too good…”",2],
+      ["“Are you irradiated right now, dude?”",1],["“Maybe get some air?”",0]]),
+    TU,
+    S("Spendy","I’m sure he’ll be fine."),
+    S("Sparky","Onto the next one!"),
+]},
+
+/* ------------------------------------------------------------- GERD */
+{ id:"gerd", title:"Gerd", char:"gerd", bg:"gerd", hue:45,
+  // BACKGROUND PNG: assets/bg/gerd.png
+  steps:[
+    N("A very disproportionate man takes the seat across from you. He combs back his flowing hair and squints at you, assessing your every move."),
+    S("Sparky","This is Gerd, {age}. He’s in political science and always has a little tidbit to share–!"),
+    S("Gerd","Erm, actually, they’re not tidbits, they’re morsels of information that are my duty to share!"),
+    S("Stormy","That’s wonderful, Gerd…"),
+    S("Spendy","Have fun, {name}!"),
+    A("Gerd","Are you a fan of debates?",[
+      ["“I often amuse myself with philosophical ponderings.”",2],["“Watching ‘em is cool.”",1],
+      ["“Not a fan of conflict.”",0],["“I don’t mind them.”",1]]),
+    A("Gerd","How many books do you read in a year?",[
+      ["“I don’t read much.”",0],["“Lots of comic books, mostly.”",1],
+      ["“I aim for two a week, but I squeeze in a third if I’m feeling nasty.”",2],["“Couple audiobooks a month.”",1]]),
+    A("Gerd","You’re a very attractive person. I think our genes would go nicely together. Shall we procreate?",[
+      ["“I’ll have to think about it.”",1],["“What?! No!”",0],["“Maybe somewhere down the line.”",2],["“I don’t really want kids.”",1]]),
+    TU,
+    S("Stormy","You gotta see it through my guy."),
+    S("Spendy","Yeah, keep going!"),
+]},
+
+/* ------------------------------------------------------------ SHADY
+   Spooky interlude: no points (every reply is 0) and no ending. */
+{ id:"shady", title:"???", char:"shady", bg:"shady", hue:260, fx:"spooky", noScore:true,
+  // BACKGROUND PNG: assets/bg/shady.png
+  steps:[
+    N("The room’s temperature seems to plummet ten degrees. You feel strangely observed, scanning the bar, not noticing the shadowed figure that silently meets you from across the table."),
+    N("The figure says nothing."),
+    A(null,null,[["Who are you?",0],["What do you want?",0],["How did you find me?",0],["Leave me alone!",0]]),
+    S("?????","Hello… {name}..."),
+    A(null,null,[["Who are you?",0],["What do you want?",0],["How did you find me?",0],["Leave me alone!",0]]),
+    S("?ha??","you know… what you did…"),
+    A(null,null,[["Who are you?",0],["What do you want?",0],["How did you find me?",0],["Leave me alone!",0]]),
+    S("Shady","Don’t forget about me, {name}."),
+    A(null,null,[["Who are you?",0],["What do you want?",0],["How did you find me?",0],["Leave me alone!",0]]),
+    N("The presence is gone quickly, as if you imagined it."),
+    { t:"fx", fx:null },
+    S("Sparky","You okay? You zoned out for a bit over there."),
+    S("Trendy","We were worried about you."),
+    S("Spendy","You’re ready for the next date, right?"),
+    S("Stormy","Because you’re over halfway there!"),
+]},
+
+/* -------------------------------------------------------- ANASTASIA */
+{ id:"anastasia", title:"Anastasia", char:"anastasia", bg:"anastasia", hue:300,
+  // BACKGROUND PNG: assets/bg/anastasia.png
+  steps:[
+    N("Soft-footed and mysterious, your next date slinks into her seat like a rolling wave of tar, adorned with silver jewelry and crude makeup. Her expression is set in a frigid sort of numbness."),
+    S("Trendy","This is Anastasia, {age}, a Creative Writing major!"),
+    S("Sparky","Have fun!"),
+    A("Anastasia","My soul greets yours.",[["“Uh… thanks?”",0],["“And mine in turn.”",0],["*say nothing*",0]]),
+    A("Anastasia","Do you also view the concept of speed-dating as an unnecessary display of vulnerability?",[
+      ["“Yes, I wish we had a different way to meet each other.”",2],["“...not really?”",0],
+      ["“Sort of.”",1],["“I’ve never thought of it like that.”",1]]),
+    A("Anastasia","Are you familiar with the occult?",[
+      ["“I’m open to learning what it is.”",1],["“I practice it in my own time.”",2],
+      ["“I know a couple of witches, actually.”",1],["“No clue what that is.”",0]]),
+    A("Anastasia","I’m taken by you. Would you be my muse?",[
+      ["“As long as it’s nothing weird.”",1],["“I mean, sure, I guess.”",1],
+      ["“That’s kinda creepy.”",0],["“I would be honoured.”",2]]),
+    TU,
+    S("Spendy","We’re just flying through them, aren’t we?"),
+    S("Trendy","Are you feeling a surge of love in the air yet?"),
+]},
+
+/* -------------------------------------------------------- MACKENZIE */
+{ id:"mackenzie", title:"Mackenzie", char:"mackenzie", bg:"mackenzie", hue:335,
+  // BACKGROUND PNG: assets/bg/mackenzie.png
+  steps:[
+    N("A new woman takes Anastasia’s place, popping her bubblegum as her nails click away noisily on her phone. She takes half glances up from her screen before finally putting her phone away to give you her undivided attention."),
+    S("Stormy","This is Mackenzie, {age}, a Communications Major."),
+    S("Sparky","She’s a tough nut to crack, but you got this!"),
+    A("Mackenzie","So… what do you do for fun?",[
+      ["“I like experimenting with my look.”",1],["“I mostly study, honestly.”",0],["“I go to the gym!”",2],["“I read.”",1]]),
+    A("Mackenzie","Where do you see yourself in five years?",[
+      ["“Unemployed, and in my mom’s basement.”",0],["“Definitely a finance bro in NYC.”",2],
+      ["“Prolly working at McDonalds.”",1],["“Ideally with you, wink wink.”",1]]),
+    A("Mackenzie","Would you do 50/50 in a relationship?",[
+      ["“No, I’d pay for everything.”",2],["“No, I want my partner to pay for everything.”",0],
+      ["“Uh, I guess.”",1],["“Ever heard of this thing called dine and dash?”",1]]),
+    TU,
+    S("Sparky","One more left!"),
+    S("Trendy","Make it count!"),
+]},
+
+/* ---------------------------------------------------------- RACCOON */
+{ id:"raccoon", title:"Raccoon", char:"raccoon", bg:"raccoon", hue:180,
+  // BACKGROUND PNG: assets/bg/raccoon.png
+  steps:[
+    N("Instead of a human like you were expecting, a raccoon clambers into the seat. It stares up at you with big, black eyes, making soft raccoon noises."),
+    N("The raccoon says nothing because it can’t speak."),
+    A(null,null,[["pet it",0],["call it closer",2],["feed it garbage",0],["ignore it",0]]),
+    N("The raccoon continues to say nothing because it can’t speak."),
+    A(null,null,[["pet it",2],["call it closer",0],["feed it garbage",0],["ignore it",0]]),
+    N("The raccoon still says nothing because it still can’t speak."),
+    A(null,null,[["pet it",0],["call it closer",0],["feed it garbage",2],["ignore it",0]]),
+    N("The raccoon scampers off quietly, because it can’t speak. You almost miss it."),
+    S("Stormy","That was weird…"),
+    S("Spendy","Yeah, but anyways, back to our regularly scheduled programming!"),
+]},
+
+/* ---------------------------------------------------------- EIGHDYN */
+{ id:"eighdyn", title:"Eighdyn", char:"eighdyn", bg:"eighdyn", hue:160,
+  // BACKGROUND PNG: assets/bg/eighdyn.png
+  steps:[
+    N("The man across from you swirls his matcha cup, a labubu hanging neatly from his carabiner, unopened novel sticking out of his backpocket. He flicks the curled up end of his mullet, lounged back in his chair like speed dating is his comfort zone."),
+    S("Sparky","This is Eighdyn, {age}, a Health Sciences Major!"),
+    S("Spendy","Get chatting!"),
+    A("Eighdyn","Sup. Did it hurt when you fell from heaven?",[["“Hey.”",0],["“Not really.”",0],["*say nothing*",0]]),
+    A("Eighdyn", "You big into fashion?", [["“Yeah, just not yours.”", 0],["“Not really.”",1],["“I'm open to learn!”",1],["“Yes! It's only my favourite thing ever!”",2]]),
+    A("Eighdyn","Are you into Matcha, maybe we could go sometime? By the way, I'm an avid reader of feminist literature.",[
+      ["“I love Matcha, I also appreciate Labubus.”",2],["“I like reading too, I guess.”",1],
+      ["“I hope you are actively deconstructing misogyny. On the daily.”",1],["“That green stuff is nasty. Hard pass!”",0]]),
+    A("Eighdyn","What kind of music do you listen to? I cry to Phoebe Bridgers in the shower sometimes.",[
+      ["“That’s kind of lame, dude.”",0],["“No way, same!”",2],
+      ["“I kind of listen to everything, not going to lie…”",1],["“Overshare much…”",1]]),,
+    TU,
+    S("Sparky","Looks like that was the last guy!"),
+]},
+
+/* -------------------------------------------------------- OUTRODUCTION */
+{ id:"outro", title:null, char:null, bg:"pub", hue:285,
+  // BACKGROUND PNG: assets/bg/pub.png
+  steps:[
+    S("Spendy","Thank you for coming to our SFU Speed Dating Event!"),
+    S("Sparky","We know it was impromptu, so we really appreciate it!"),
+    S("Trendy","And we hope you think it was the best thing ever!"),
+    S("Stormy","Let’s see how you did, champ!"),
+    { t:"summary" },
+]},
+];
+
+/* =====================================================================
+   ENGINE
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const game = $("game"), bgEl = $("bg"), dlg = $("dialogue"), nameplate = $("nameplate"),
+      bubble = $("bubble"), textEl = $("text"), caret = $("caret"), choicesEl = $("choices");
+
+let FLOW = [];              // flattened list of steps
+let st;                     // game state
+
+function newState() {
+  const points = {};
+  Object.keys(CHARS).forEach(k => points[k] = 0);
+  return { name:"Player", points, i:0, dateKey:null, typing:null, waiting:null, timer:null, choiceOpts:null, sceneNum:0 };
+}
+
+function buildFlow() {
+  FLOW = [];
+  let n = 0;
+  SCENES.forEach(sc => {
+    const scored = sc.char && !sc.noScore;
+    if (scored) n++;
+    FLOW.push({ t:"scene", sc, num: scored ? n : 0 });
+    sc.steps.forEach(s => FLOW.push(s));
+  });
+}
+const TOTAL_DATES = () => SCENES.filter(s => s.char && !s.noScore).length;
+
+function fmt(t) {
+  const age = st.dateKey && CHARS[st.dateKey] ? CHARS[st.dateKey].age : "";
+  return t.replace(/\{name\}/g, st.name).replace(/\{age\}/g, age);
+}
+const keyOf = who => {
+  if (!who) return null;
+  const w = who.toLowerCase().replace(/[^a-z]/g, "");
+  if (!w || w === "ha") return "shady";            // "?????" and "?ha??"
+  return w;
+};
+
+/* ---------- sprites ---------- */
+function setSprite(el, key, active) {
+  if (!key) { el.classList.remove("show", "active"); return; }
+  const img = el.querySelector("img"), ph = el.querySelector(".ph");
+  if (el.dataset.key !== key) {
+    el.dataset.key = key;
+    ph.textContent = `[${key}.png]`;
+    ph.style.display = "none";
+    img.style.display = "block";
+    img.onerror = () => { img.style.display = "none"; ph.style.display = "flex"; };
+    img.src = CHAR_PATH(key);       // CHARACTER PNG
+  }
+  el.classList.add("show");
+  el.classList.toggle("active", !!active);
+}
+function updateSprites(speakerKey) {
+  const hostSpeaking = speakerKey && HOSTS.includes(speakerKey) && speakerKey !== st.dateKey;
+  setSprite($("spriteL"), hostSpeaking ? speakerKey : null, true);
+  setSprite($("spriteR"), st.dateKey, speakerKey === st.dateKey || !speakerKey || speakerKey === "you");
+}
+
+/* ---------- speech bubble ---------- */
+function showBubble(who, text, kind, done) {
+  clearInterval(st.timerType);
+  dlg.style.display = "block";
+  dlg.className = kind;                       // npc | player | narr
+  nameplate.textContent = who || "";
+  caret.classList.remove("on");
+  let italic = false;
+  if (text.length > 2 && text.startsWith("*") && text.endsWith("*")) { text = text.slice(1, -1); italic = true; }
+  bubble.classList.toggle("italic", italic);
+  textEl.textContent = "";
+  updateSprites(kind === "player" ? "you" : keyOf(who));
+
+  let i = 0;
+  const finish = () => {
+    clearInterval(st.timerType);
+    textEl.textContent = text;
+    st.typing = null;
+    done && done();
+  };
+  st.typing = { finish };
+  st.timerType = setInterval(() => {
+    i++;
+    textEl.textContent = text.slice(0, i);
+    if (i >= text.length) finish();
+  }, TYPE_MS);
+}
+const waitClick = () => { st.waiting = "click"; caret.classList.add("on"); };
+
+/* ---------- main step runner ---------- */
+function next() {
+  if (st.i >= FLOW.length) return;
+  const s = FLOW[st.i++];
+  st.waiting = null;
+  caret.classList.remove("on");
+
+  switch (s.t) {
+    case "scene": {
+      const sc = s.sc;
+      st.dateKey = sc.char;
+      bgEl.style.setProperty("--bg", `url("${BG_PATH(sc.bg)}")`);     // BACKGROUND PNG
+      bgEl.style.setProperty("--hue", sc.hue ?? 280);
+      game.classList.toggle("spooky", sc.fx === "spooky");
+      $("hudScene").textContent = s.num ? `Date ${s.num} of ${TOTAL_DATES()} – ${sc.title}` : (sc.id === "intro" ? "SFU Burnaby – Biercraft" : "");
+      dlg.style.display = "none";
+      updateSprites(null);
+      if (sc.title) {
+        $("cardSmall").textContent = s.num ? `Date ${s.num}` : "";
+        $("cardBig").textContent = sc.title;
+        const c = $("titleCard");
+        c.classList.remove("on"); void c.offsetWidth; c.classList.add("on");
+        st.waiting = "card";
+        st.timer = setTimeout(() => endOverlay(c), 1700);
+      } else next();
+      break;
+    }
+    case "fx":
+      game.classList.toggle("spooky", !!s.fx);
+      next(); break;
+    case "say":
+      showBubble(s.who, fmt(s.text), "npc", waitClick); break;
+    case "narr":
+      showBubble(null, fmt(s.text), "narr", waitClick); break;
+    case "ask": {
+      const show = () => renderChoices(s.opts);
+      if (s.text) showBubble(s.who, fmt(s.text), "npc", show); else show();
+      break;
+    }
+    case "timesup": {
+      choicesEl.style.display = "none";
+      const t = $("timesUp");
+      t.classList.remove("on"); void t.offsetWidth; t.classList.add("on");
+      st.waiting = "card";
+      st.timer = setTimeout(() => endOverlay(t), 1400);
+      break;
+    }
+    case "name":
+      $("nameScreen").classList.add("on");
+      $("nameInput").value = "";
+      setTimeout(() => $("nameInput").focus(), 50);
+      break;
+    case "summary":
+      showSummary(); break;
+  }
+  updateDebug();
+}
+function endOverlay(el) { el.classList.remove("on"); st.waiting = null; next(); }
+
+/* ---------- choices ---------- */
+function renderChoices(opts) {
+  choicesEl.innerHTML = "";
+  st.choiceOpts = opts;
+  opts.forEach((o, idx) => {
+    const b = document.createElement("button");
+    const raw = o[0], it = raw.length > 2 && raw.startsWith("*") && raw.endsWith("*");
+    if (it) b.className = "it";
+    b.innerHTML = `<span class="n">${idx + 1}</span><span class="t"></span>`;
+    b.querySelector(".t").textContent = it ? raw.slice(1, -1) : raw;
+    b.onclick = e => { e.stopPropagation(); choose(idx); };
+    choicesEl.appendChild(b);
+  });
+  choicesEl.style.display = "flex";
+}
+function choose(idx) {
+  if (!st.choiceOpts) return;
+  const [txt, pts] = st.choiceOpts[idx];
+  st.choiceOpts = null;
+  choicesEl.style.display = "none";
+  if (st.dateKey && st.dateKey !== "shady") {
+    st.points[st.dateKey] = Math.min(MAX_POINTS, st.points[st.dateKey] + pts);
+  }
+  showBubble("You", txt, "player", waitClick);
+  updateDebug();
+}
+
+/* ---------- advance on click / key ---------- */
+function advance() {
+  if (st.choiceOpts) return;
+  if (st.typing) { st.typing.finish(); return; }
+  if (st.waiting === "click") { next(); }
+  else if (st.waiting === "card") {
+    clearTimeout(st.timer);
+    ["titleCard", "timesUp"].forEach(id => $(id).classList.remove("on"));
+    st.waiting = null; next();
+  }
+}
+game.addEventListener("click", advance);
+document.addEventListener("keydown", e => {
+  if (!st || $("startScreen").classList.contains("on")) return;
+  if ($("nameScreen").classList.contains("on")) { if (e.key === "Enter") submitName(); return; }
+  if (e.key === "d" || e.key === "D") { $("debug").style.display = $("debug").style.display === "block" ? "none" : "block"; updateDebug(); return; }
+  if (st.choiceOpts && /^[1-9]$/.test(e.key)) { const n = +e.key - 1; if (n < st.choiceOpts.length) choose(n); return; }
+  if (e.key === " " || e.key === "Enter") { e.preventDefault(); advance(); }
+});
+
+function updateDebug() {
+  const d = $("debug");
+  if (d.style.display !== "block") return;
+  d.textContent = Object.entries(st.points).filter(([k]) => k !== "shady").map(([k, v]) => `${k}:${v}`).join("  ");
+}
+
+/* ---------- name entry ---------- */
+function submitName() {
+  const v = $("nameInput").value.trim();
+  st.name = v || "Player";
+  $("nameScreen").classList.remove("on");
+  next();
+}
+$("nameBtn").onclick = e => { e.stopPropagation(); submitName(); };
+
+/* ---------- summary (loves & hates) ---------- */
+function showSummary() {
+  dlg.style.display = "none";
+  setSprite($("spriteL"), null); setSprite($("spriteR"), null);
+  bgEl.style.setProperty("--bg", `url("${BG_PATH("summary")}")`);     // BACKGROUND PNG: assets/bg/summary.png
+  const list = $("summaryList");
+  list.innerHTML = "";
+  Object.keys(CHARS).filter(k => k !== "shady")
+    .sort((a, b) => st.points[b] - st.points[a])
+    .forEach(k => {
+      const p = st.points[k];
+      const row = document.createElement("div");
+      row.className = "row" + (p >= MAX_POINTS ? " max" : "");
+      let hearts = "";
+      for (let i = 0; i < MAX_POINTS; i++) hearts += i < p ? "♥" : '<span class="off">♥</span>';
+      row.innerHTML = `<strong>${CHARS[k].name}</strong><span class="hearts">${hearts}</span><span class="status">${STATUS[p]}</span>`;
+      list.appendChild(row);
+    });
+  $("summaryScreen").classList.add("on");
+}
+$("summaryBtn").onclick = e => {
+  e.stopPropagation();
+  $("summaryScreen").classList.remove("on");
+  decideEnding();
+};
+
+/* ---------- endings ---------- */
+function decideEnding() {
+  const unlocked = Object.keys(CHARS).filter(k => k !== "shady" && st.points[k] >= MAX_POINTS);
+  const options = unlocked.map(k => ({ key:k, ...CHARS[k] }));
+  if (SPECIAL_REQUIRES.every(k => st.points[k] >= MAX_POINTS)) options.push({ key:"special", ...SPECIAL_ENDING });
+
+  if (options.length === 0) showEnding(ALONE_ENDING);                  // Ending A
+  else if (options.length === 1) showEnding(options[0]);
+  else {
+    const list = $("pickList");
+    list.innerHTML = "";
+    options.forEach(o => {
+      const b = document.createElement("button");
+      b.className = "btn";
+      b.textContent = `Ending ${o.letter} – ${o.name}`;
+      b.onclick = e => { e.stopPropagation(); $("pickScreen").classList.remove("on"); showEnding(o); };
+      list.appendChild(b);
+    });
+    $("pickScreen").classList.add("on");
+  }
+}
+function showEnding(e) {
+  const scr = $("endScreen");
+  // BACKGROUND PNG for each ending: assets/bg/ending_a.png ... ending_k.png
+  scr.style.backgroundImage = `url("${BG_PATH(e.bg)}"), radial-gradient(circle at 50% 30%, rgba(122,92,255,.55), rgba(18,10,28,.95))`;
+  $("endLetter").textContent = `ENDING ${e.letter}`;
+  $("endTitle").textContent = e.name;
+  $("endText").textContent = e.ending;
+  scr.classList.add("on");
+}
+$("againBtn").onclick = e => { e.stopPropagation(); startGame(); };
+
+/* ---------- start / restart ---------- */
+function startGame() {
+  clearTimeout(st && st.timer); clearInterval(st && st.timerType);
+  st = newState();
+  buildFlow();
+  ["startScreen","nameScreen","summaryScreen","pickScreen","endScreen","titleCard","timesUp"]
+    .forEach(id => $(id).classList.remove("on"));
+  choicesEl.style.display = "none";
+  dlg.style.display = "none";
+  game.classList.remove("spooky");
+  setSprite($("spriteL"), null); setSprite($("spriteR"), null);
+  next();
+}
+st = newState();
+$("startBtn").onclick = e => { e.stopPropagation(); startGame(); };
+</script>
+</body>
+</html>
