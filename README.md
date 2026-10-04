@@ -1,5 +1,5 @@
 # Stormhacks2026
-Yo Girt (Vijeta Dhalla, Arianna Suen, Grace Young) submission for StormHacks 2026
+Team Yo Girt's (Vijeta Dhalla, Arianna Suen, Grace Young) submission for StormHacks 2026
 
 # About the Project
 
